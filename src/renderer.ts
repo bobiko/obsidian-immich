@@ -31,7 +31,7 @@ export class GridView extends Renderer {
     this.scrollEl = options.scrollEl
     this.onThumbnailClick = options.onThumbnailClick
     this.containerEl = document.createElement('div')
-    this.containerEl.classList.add('google-photos-fit-content')
+    this.containerEl.classList.add('immich-fit-content')
   }
 
   /**
@@ -83,7 +83,7 @@ export class GridView extends Renderer {
         img.creationTime = moment(mediaItem.mediaMetadata.creationTime)
         img.filename = img.creationTime.format(settings.filename)
         img.onclick = onclick
-        img.classList.add('google-photos-grid-thumbnail')
+        img.classList.add('immich-grid-thumbnail')
 
         // Add to DOM first so user sees the placeholder
         el.appendChild(img)

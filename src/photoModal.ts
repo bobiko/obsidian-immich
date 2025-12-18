@@ -123,7 +123,7 @@ export class PickerModal extends PhotosModal {
 
   async onOpen() {
     const { contentEl, modalEl } = this
-    modalEl.addClass('google-photos-modal-grid')
+    modalEl.addClass('immich-modal-grid')
 
     // Show loading message with spinner
     contentEl.createEl('h2', { text: 'Immich' })

@@ -147,7 +147,7 @@ export default class CodeblockProcessor {
   }
 
   createDeprecationNotice() {
-    const noticeEl = this.parentEl.createEl('div', { cls: 'google-photos-warning' })
+    const noticeEl = this.parentEl.createEl('div', { cls: 'immich-warning' })
     noticeEl.createEl('p', {
       text: '📋 Codeblock queries are no longer supported.'
     })

@@ -57,8 +57,6 @@ Embed memories for the note's date (from front matter `created`/`date`/`title`):
 ```
 ````
 
-````
-
 Photos load from that calendar day across years and group by year. Click a photo to insert a link to Immich.
 
 ## Front Matter
