@@ -30,14 +30,14 @@ A plugin to insert photos from your [Immich](https://immich.app/) server into yo
 2. **Configure in Obsidian**:
 
     - Settings → Community Plugins → Immich
-    - **Lokalny adres URL (Immich)**: Your local URL (e.g. `http://192.168.1.10:2283`)
-    - **Zdalny adres URL (Immich)**: Your remote URL (e.g. `https://photos.example.com`)
+    - **Local URL (Immich)**: Your local URL (e.g. `http://192.168.1.10:2283`)
+    - **Remote URL (Immich)**: Your remote URL (e.g. `https://photos.example.com`)
     - **Immich API Key**: Paste your API key
-    - **Preferuj lokalny adres**: Toggle to try local first, then fallback to remote
+    - **Prefer local URL**: Toggle to try local first, then fallback to remote
 
 3. **Choose how to insert photos**:
-    - **Pobierać zdjęcia lokalnie** (ON): Downloads photos to your vault
-    - **Pobierać zdjęcia lokalnie** (OFF): Links directly to Immich
+    - **Download images locally** (ON): Downloads photos to your vault
+    - **Download images locally** (OFF): Links directly to Immich
 
 ## Usage
 

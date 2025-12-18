@@ -227,18 +227,21 @@
 }
 
 /* Settings styles */
-.google-photos-api-notice .setting-item-description {
+.google-photos-api-notice .setting-item-description,
+.immich-api-notice .setting-item-description {
   color: var(--text-warning);
   font-weight: 500;
 }
 
-.google-photos-limitations .setting-item-description {
+.google-photos-limitations .setting-item-description,
+.immich-limitations .setting-item-description {
   white-space: pre-line;
   color: var(--text-muted);
   font-size: 0.9em;
 }
 
-.google-photos-limitations .setting-item-name {
+.google-photos-limitations .setting-item-name,
+.immich-limitations .setting-item-name {
   color: var(--text-warning);
   font-weight: 500;
 }

@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting } from 'obsidian'
 import { FolderSuggest } from './suggesters/FolderSuggester'
-import GooglePhotos from './main'
+import ImmichPlugin from './main'
 
 export enum GetDateFromOptions {
   NOTE_TITLE = 'Note\'s title',
@@ -22,7 +22,7 @@ export interface ImmichSettings {
   locationOption: string;
   locationFolder: string;
   locationSubfolder: string;
-  convertPastedLink: boolean; // Monitor paste events to see if it's a Google Photo link
+  convertPastedLink: boolean; // Monitor paste events for photo links
   // Legacy settings kept for compatibility but no longer used for filtering
   defaultToDailyPhotos: boolean;
   getDateFrom: GetDateFromOptions;
@@ -58,9 +58,9 @@ export const DEFAULT_SETTINGS: ImmichSettings = {
 }
 
 export class ImmichSettingTab extends PluginSettingTab {
-  plugin: GooglePhotos
+  plugin: ImmichPlugin
 
-  constructor(app: App, plugin: GooglePhotos) {
+  constructor(app: App, plugin: ImmichPlugin) {
     super(app, plugin)
     this.plugin = plugin
   }
@@ -78,20 +78,20 @@ export class ImmichSettingTab extends PluginSettingTab {
      API Update Notice
      */
     new Setting(containerEl)
-      .setDesc('Połącz Obsidian z Twoją instancją Immich. Możesz podać lokalny i zdalny adres URL – wtyczka spróbuje lokalnego najpierw i w razie błędu przełączy się na zdalny.')
-      .setClass('google-photos-api-notice')
+      .setDesc('Connect Obsidian to your Immich instance. You can provide both local and remote URLs – the plugin will try local first and fall back to remote on error.')
+      .setClass('immich-api-notice')
 
     /*
      Limitations Notice
      */
     new Setting(containerEl)
-      .setName('Jak to działa')
-      .setDesc('• Użyj polecenia „Wstaw zdjęcie z Immich"\n• Wybierz zdjęcie z listy zasobów Immich\n• Zdjęcie zostanie pobrane lub zlinkowane (w zależności od ustawień)')
-      .setClass('google-photos-limitations')
+      .setName('How it works')
+      .setDesc('• Use the "Insert Immich Photo" command\n• Select a photo from the Immich asset list\n• Photo will be downloaded or linked (depending on settings)')
+      .setClass('immich-limitations')
 
     new Setting(containerEl)
-      .setName('Pobierać zdjęcia lokalnie')
-      .setDesc('Włączone: pobiera zdjęcia do vaultu. Wyłączone: wstawia tylko link do Immich.')
+      .setName('Download images locally')
+      .setDesc('Enabled: downloads photos to vault. Disabled: inserts only a link to Immich.')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.downloadImages)
         .onChange(async (value) => {
@@ -112,8 +112,8 @@ export class ImmichSettingTab extends PluginSettingTab {
      Immich connection
      */
     new Setting(containerEl)
-      .setName('Lokalny adres URL (Immich)')
-      .setDesc('Np. http://192.168.1.10:2283 – używany w sieci domowej')
+      .setName('Local URL (Immich)')
+      .setDesc('E.g. http://192.168.1.10:2283 – used on home network')
       .addText(text => text
         .setPlaceholder('http://192.168.1.10:2283')
         .setValue(this.plugin.settings.immichLocalUrl)
@@ -122,8 +122,8 @@ export class ImmichSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings()
         }))
     new Setting(containerEl)
-      .setName('Zdalny adres URL (Immich)')
-      .setDesc('Np. https://photos.example.com – używany poza siecią lokalną')
+      .setName('Remote URL (Immich)')
+      .setDesc('E.g. https://photos.example.com – used outside local network')
       .addText(text => text
         .setPlaceholder('https://photos.example.com')
         .setValue(this.plugin.settings.immichRemoteUrl)
@@ -132,8 +132,8 @@ export class ImmichSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings()
         }))
     new Setting(containerEl)
-      .setName('Preferuj lokalny adres')
-      .setDesc('Próbuj najpierw lokalnego adresu; w razie błędu przełącz na zdalny')
+      .setName('Prefer local URL')
+      .setDesc('Try local URL first; fall back to remote on error')
       .addToggle(toggle => toggle
         .setValue(this.plugin.settings.preferLocal)
         .onChange(async value => {
@@ -142,7 +142,7 @@ export class ImmichSettingTab extends PluginSettingTab {
         }))
     new Setting(containerEl)
       .setName('Immich API Key')
-      .setDesc('Utwórz klucz API w Immich (Profil → API Keys) i wklej tutaj')
+      .setDesc('Create an API key in Immich (Profile → API Keys) and paste it here')
       .addText(text => text
         .setPlaceholder('immich_api_key')
         .setValue(this.plugin.settings.immichApiKey)
