@@ -205,11 +205,7 @@ GPL-3.0 license
 
 **Note:** This plugin works with Google's current Picker API and should remain functional as long as Google maintains this API. The previous Library API limitations were imposed by Google's business decisions, not technical constraints.
 
-![](https://img.shields.io/github/license/alangrainger/obsidian-google-photos) ![](https://img.shields.io/github/v/release/alangrainger/obsidian-google-photos?style=flat-square) ![](https://img.shields.io/github/downloads/alangrainger/obsidian-google-photos/total)
-
----
-
-[📝💬 Obsidian forum link for this plugin](https://forum.obsidian.md/t/51062)
+![](https://img.shields.io/github/license/bobiko/obsidian-immich) ![](https://img.shields.io/github/v/release/bobiko/obsidian-immich?style=flat-square) ![](https://img.shields.io/github/downloads/bobiko/obsidian-immich/total)
 
 This plugin let's you embed Google Photos images directly into Obsidian. When you select an image, it will save and embed a low-res thumbnail with a link back to the full-res image on Google Photos.
 
