@@ -1,30 +1,34 @@
 {
-	"name": "google-photos",
-	"version": "2.0.0",
-	"description": "Embed Google Photos images using the new Picker API (Legacy Library API features removed)",
-	"main": "main.js",
-	"scripts": {
-		"dev": "node esbuild.config.mjs",
-		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-		"version": "node version-bump.mjs && git add manifest.json versions.json",
-		"lint": "eslint . --ext .ts",
-		"lint:fix": "eslint . --ext .ts --fix"
-	},
-	"keywords": [],
-	"author": "Alan Grainger",
-	"license": "GPL-3.0-or-later",
-	"devDependencies": {
-		"@popperjs/core": "^2.11.6",
-		"@types/node": "^16.11.6",
-		"@typescript-eslint/eslint-plugin": "5.29.0",
-		"@typescript-eslint/parser": "5.29.0",
-		"builtin-modules": "3.3.0",
-		"esbuild": "0.14.47",
-		"eslint": "^8.47.0",
-		"eslint-config-standard": "^17.1.0",
-		"litepicker": "^2.0.12",
-		"obsidian": "latest",
-		"tslib": "2.4.0",
-		"typescript": "4.7.4"
-	}
+    "name": "immich",
+    "version": "1.0.0",
+    "description": "Insert photos from your Immich server with local/remote URL support. Fork adapted from obsidian-google-photos to work with Immich instead.",
+    "main": "main.js",
+    "scripts": {
+        "dev": "node esbuild.config.mjs",
+        "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+        "version": "node version-bump.mjs && git add manifest.json versions.json",
+        "lint": "eslint . --ext .ts",
+        "lint:fix": "eslint . --ext .ts --fix"
+    },
+    "keywords": [
+        "immich",
+        "photos",
+        "local-storage"
+    ],
+    "author": "Bobiko",
+    "license": "GPL-3.0-or-later",
+    "devDependencies": {
+        "@popperjs/core": "^2.11.6",
+        "@types/node": "^16.11.6",
+        "@typescript-eslint/eslint-plugin": "5.29.0",
+        "@typescript-eslint/parser": "5.29.0",
+        "builtin-modules": "3.3.0",
+        "esbuild": "0.14.47",
+        "eslint": "^8.47.0",
+        "eslint-config-standard": "^17.1.0",
+        "litepicker": "^2.0.12",
+        "obsidian": "latest",
+        "tslib": "2.4.0",
+        "typescript": "4.7.4"
+    }
 }

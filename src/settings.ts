@@ -1,4 +1,4 @@
-import { App, moment, PluginSettingTab, Setting } from 'obsidian'
+import { App, PluginSettingTab, Setting } from 'obsidian'
 import { FolderSuggest } from './suggesters/FolderSuggester'
 import GooglePhotos from './main'
 
@@ -8,12 +8,13 @@ export enum GetDateFromOptions {
   USE_TODAY = 'Use today\'s date',
 }
 
-export interface GooglePhotosSettings {
-  clientId: string;
-  clientSecret: string;
-  accessToken: string;
-  refreshToken: string;
-  expires: string;
+export interface ImmichSettings {
+  // Immich connection
+  immichLocalUrl: string; // e.g. http://192.168.1.10:2283
+  immichRemoteUrl: string; // e.g. https://photos.example.com
+  immichApiKey: string; // Immich API key (x-api-key)
+  preferLocal: boolean; // try local first, fallback to remote
+  downloadImages: boolean; // true = download, false = link only
   thumbnailWidth: number;
   thumbnailHeight: number;
   filename: string;
@@ -32,16 +33,16 @@ export interface GooglePhotosSettings {
   showPhotosXDaysFuture: number;
 }
 
-export const DEFAULT_SETTINGS: GooglePhotosSettings = {
-  clientId: '',
-  clientSecret: '',
-  accessToken: '',
-  refreshToken: '',
-  expires: moment().format(),
+export const DEFAULT_SETTINGS: ImmichSettings = {
+  immichLocalUrl: '',
+  immichRemoteUrl: '',
+  immichApiKey: '',
+  preferLocal: true,
+  downloadImages: true,
   thumbnailWidth: 400,
   thumbnailHeight: 280,
-  filename: 'YYYY-MM-DD[_google-photo_]HHmmss[.jpg]',
-  thumbnailMarkdown: '[![]({{local_thumbnail_link}})]({{google_photo_url}}) ',
+  filename: 'YYYY-MM-DD[_immich_]HHmmss[.jpg]',
+  thumbnailMarkdown: '[![]({{local_thumbnail_link}})]({{immich_photo_url}}) ',
   locationOption: 'note',
   locationFolder: '',
   locationSubfolder: 'photos',
@@ -56,37 +57,47 @@ export const DEFAULT_SETTINGS: GooglePhotosSettings = {
   showPhotosXDaysFuture: 1
 }
 
-export class GooglePhotosSettingTab extends PluginSettingTab {
+export class ImmichSettingTab extends PluginSettingTab {
   plugin: GooglePhotos
 
-  constructor (app: App, plugin: GooglePhotos) {
+  constructor(app: App, plugin: GooglePhotos) {
     super(app, plugin)
     this.plugin = plugin
   }
 
-  display (): void {
+  display(): void {
     const { containerEl } = this
 
     containerEl.empty()
 
     new Setting(containerEl)
-      .setName('Google Photos - Picker API')
+      .setName('Immich')
       .setHeading()
 
     /*
      API Update Notice
      */
     new Setting(containerEl)
-      .setDesc('✅ This plugin now uses Google\'s new Picker API for photo selection.')
+      .setDesc('Połącz Obsidian z Twoją instancją Immich. Możesz podać lokalny i zdalny adres URL – wtyczka spróbuje lokalnego najpierw i w razie błędu przełączy się na zdalny.')
       .setClass('google-photos-api-notice')
 
     /*
      Limitations Notice
      */
     new Setting(containerEl)
-      .setName('How it works')
-      .setDesc('• Click "Insert Google Photo" command to open the photo picker\n• Select photos manually through Google Photos interface\n• Photos are automatically downloaded as thumbnails and linked to originals\n• Date filtering and automatic queries are no longer available due to Google\'s API changes')
+      .setName('Jak to działa')
+      .setDesc('• Użyj polecenia „Wstaw zdjęcie z Immich"\n• Wybierz zdjęcie z listy zasobów Immich\n• Zdjęcie zostanie pobrane lub zlinkowane (w zależności od ustawień)')
       .setClass('google-photos-limitations')
+
+    new Setting(containerEl)
+      .setName('Pobierać zdjęcia lokalnie')
+      .setDesc('Włączone: pobiera zdjęcia do vaultu. Wyłączone: wstawia tylko link do Immich.')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.downloadImages)
+        .onChange(async (value) => {
+          this.plugin.settings.downloadImages = value
+          await this.plugin.saveSettings()
+        }))
 
     /**
      * Show or hide a setting item
@@ -98,52 +109,46 @@ export class GooglePhotosSettingTab extends PluginSettingTab {
     }
 
     /*
-     Google Photos API connection
+     Immich connection
      */
-
     new Setting(containerEl)
-      .setName('Client ID')
+      .setName('Lokalny adres URL (Immich)')
+      .setDesc('Np. http://192.168.1.10:2283 – używany w sieci domowej')
       .addText(text => text
-        .setPlaceholder('Enter your Client ID')
-        .setValue(this.plugin.settings.clientId)
+        .setPlaceholder('http://192.168.1.10:2283')
+        .setValue(this.plugin.settings.immichLocalUrl)
         .onChange(async value => {
-          this.plugin.settings.clientId = value.trim()
+          this.plugin.settings.immichLocalUrl = value.trim().replace(/\/$/, '')
           await this.plugin.saveSettings()
         }))
-      .then(setting => {
-        setting.descEl.appendText('Client ID from Google Photos Picker API.')
-        setting.descEl.createEl('br')
-        setting.descEl.createEl('a', {
-          text: 'See the setup documentation',
-          href: 'https://github.com/alangrainger/obsidian-google-photos/blob/main/docs/Setup-PickerAPI.md'
-        })
-        setting.descEl.appendText(' for instructions on how to get this ID.')
-      })
     new Setting(containerEl)
-      .setName('Client Secret')
+      .setName('Zdalny adres URL (Immich)')
+      .setDesc('Np. https://photos.example.com – używany poza siecią lokalną')
       .addText(text => text
-        .setPlaceholder('Enter your Client Secret')
-        .setValue(this.plugin.settings.clientSecret)
+        .setPlaceholder('https://photos.example.com')
+        .setValue(this.plugin.settings.immichRemoteUrl)
         .onChange(async value => {
-          this.plugin.settings.clientSecret = value.trim()
+          this.plugin.settings.immichRemoteUrl = value.trim().replace(/\/$/, '')
           await this.plugin.saveSettings()
         }))
-      .then(setting => {
-        setting.descEl.appendText('Secret from Google Photos Picker API.')
-        setting.descEl.createEl('br')
-        setting.descEl.createEl('a', {
-          text: 'See the setup documentation',
-          href: 'https://github.com/alangrainger/obsidian-google-photos/blob/main/docs/Setup-PickerAPI.md'
-        })
-        setting.descEl.appendText(' for instructions on how to get this value.')
-      })
     new Setting(containerEl)
-      .setDesc('Google Photos will authenticate you when you first use the plugin. You can also manually start the authentication process here. Note: You may need to re-authenticate due to the API scope changes.')
-      .addButton(btn => btn
-        .setButtonText('Open Photos API auth')
-        .setCta()
-        .onClick(async () => {
-          await this.plugin.oauth.authenticate()
+      .setName('Preferuj lokalny adres')
+      .setDesc('Próbuj najpierw lokalnego adresu; w razie błędu przełącz na zdalny')
+      .addToggle(toggle => toggle
+        .setValue(this.plugin.settings.preferLocal)
+        .onChange(async value => {
+          this.plugin.settings.preferLocal = value
+          await this.plugin.saveSettings()
+        }))
+    new Setting(containerEl)
+      .setName('Immich API Key')
+      .setDesc('Utwórz klucz API w Immich (Profil → API Keys) i wklej tutaj')
+      .addText(text => text
+        .setPlaceholder('immich_api_key')
+        .setValue(this.plugin.settings.immichApiKey)
+        .onChange(async value => {
+          this.plugin.settings.immichApiKey = value.trim()
+          await this.plugin.saveSettings()
         }))
 
     /*
@@ -195,12 +200,12 @@ export class GooglePhotosSettingTab extends PluginSettingTab {
         setting.descEl.appendText('The default value is')
         setting.descEl.createEl('br')
         setting.descEl.createEl('span', { cls: 'markdown-rendered' })
-          .createEl('code', { text: 'YYYY-MM-DD[_google-photo_]HHmmss[.jpg]' })
+          .createEl('code', { text: 'YYYY-MM-DD[_immich_]HHmmss[.jpg]' })
         setting.descEl.createEl('br')
         setting.descEl.appendText('which will save thumbnails in a format like:')
         setting.descEl.createEl('br')
         setting.descEl.createEl('br')
-        setting.descEl.appendText('2022-12-25_google-photo_182557.jpg')
+        setting.descEl.appendText('2022-12-25_immich_182557.jpg')
         setting.descEl.createEl('br')
         setting.descEl.createEl('br')
         setting.descEl.appendText('The date used is the "photo taken" date from the photo\'s metadata rather than the current date/time.')
@@ -266,11 +271,11 @@ export class GooglePhotosSettingTab extends PluginSettingTab {
       .then(setting => {
         const ul = setting.descEl.createEl('ul')
         ul.createEl('li').setText('local_thumbnail_link - The path to the locally saved thumbnail image')
-        ul.createEl('li').setText('google_photo_url - The URL to the original Google Photo')
-        ul.createEl('li').setText('google_photo_desc - The description/caption from the Description text field')
+        ul.createEl('li').setText('immich_photo_url - The URL to the original Immich asset')
+        ul.createEl('li').setText('immich_photo_desc - The description/caption from Immich')
         ul.createEl('li').setText('taken_date - The date the photo was taken')
-        ul.createEl('li').setText('google_base_url - Advanced variable, see Photos API docs')
-        ul.createEl('li').setText('google_photo_id - Advanced variable, see Photos API docs')
+        ul.createEl('li').setText('immich_base_url - Advanced variable, Immich API base URL used')
+        ul.createEl('li').setText('immich_photo_id - Advanced variable, Immich asset ID')
       })
   }
 }

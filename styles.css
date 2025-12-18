@@ -1,32 +1,58 @@
 .google-photos-grid-thumbnail {
-    margin: 0 2px;
-    padding: 0;
+  margin: 0 2px;
+  padding: 0;
+}
+
+/* Immich aliases for legacy Google Photos classes */
+.immich-grid-thumbnail {
+  margin: 0 2px;
+  padding: 0;
 }
 
 .google-photos-codeblock {
-    max-height: 500px;
-    height: fit-content;
-    overflow: scroll;
+  max-height: 500px;
+  height: fit-content;
+  overflow: scroll;
 }
 
 .google-photos-modal-grid {
-    width: 80%;
+  width: 80%;
+}
+
+.immich-modal-grid {
+  width: 80%;
 }
 
 .google-photos-fit-content {
-    width: fit-content;
+  width: fit-content;
+}
+
+.immich-fit-content {
+  width: fit-content;
 }
 
 .google-photos-album-title {
-    font-variant: var(--h2-variant);
-    line-height: var(--h2-line-height);
-    font-size: var(--h2-size);
-    color: var(--h2-color);
-    font-weight: var(--h2-weight);
-    font-style: var(--h2-style);
-    font-family: var(--h2-font);
-    margin-block-start: var(--p-spacing);
-    margin-block-end: var(--p-spacing);
+  font-variant: var(--h2-variant);
+  line-height: var(--h2-line-height);
+  font-size: var(--h2-size);
+  color: var(--h2-color);
+  font-weight: var(--h2-weight);
+  font-style: var(--h2-style);
+  font-family: var(--h2-font);
+  margin-block-start: var(--p-spacing);
+  margin-block-end: var(--p-spacing);
+}
+
+.immich-album-title {
+  font-variant: var(--h2-variant);
+  line-height: var(--h2-line-height);
+  font-size: var(--h2-size);
+  color: var(--h2-color);
+  font-weight: var(--h2-weight);
+  font-style: var(--h2-style);
+  font-family: var(--h2-font);
+  margin-block-start: var(--p-spacing);
+  margin-block-end: var(--p-spacing);
 }
 
 /* Original styles */
@@ -37,12 +63,70 @@
   max-height: calc(100vh - 50px);
 }
 
+.immich-modal-grid .modal {
+  width: calc(100vw - 50px);
+  height: calc(100vh - 50px);
+  max-width: calc(100vw - 50px);
+  max-height: calc(100vh - 50px);
+}
+
 .google-photos-fit-content .setting-item-control {
+  min-width: fit-content;
+}
+
+.immich-fit-content .setting-item-control {
   min-width: fit-content;
 }
 
 .google-photos-codeblock img {
   cursor: pointer;
+}
+
+.immich-codeblock img {
+  cursor: pointer;
+}
+
+/* Immich Loader Styles */
+.immich-loader-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.immich-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-top-color: var(--interactive-accent);
+  border-radius: 50%;
+  animation: immich-spin 0.8s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes immich-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Year Section Styles */
+.immich-year-section {
+  margin-bottom: 2rem;
+}
+
+.immich-year-header {
+  font-size: 1.5em;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--background-modifier-border);
+  color: var(--text-normal);
+}
+
+.immich-grid-container {
+  margin-bottom: 1rem;
 }
 
 /* New styles for Picker API interface */
@@ -91,6 +175,55 @@
 
 .google-photos-picker-btn {
   margin: 1rem 0;
+}
+
+/* Immich codeblock styles */
+.immich-codeblock-loading {
+  padding: 1rem;
+  text-align: center;
+}
+
+.immich-codeblock-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.immich-codeblock-img-wrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.immich-codeblock-img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 4px;
+  transition: opacity 0.2s;
+  cursor: pointer;
+}
+
+.immich-codeblock-img:hover {
+  opacity: 0.85;
+}
+
+.immich-codeblock-empty,
+.immich-codeblock-error {
+  padding: 1rem;
+  border-radius: 4px;
+  margin: 1rem 0;
+}
+
+.immich-codeblock-empty {
+  background-color: var(--background-modifier-warning);
+  color: var(--text-muted);
+}
+
+.immich-codeblock-error {
+  background-color: var(--background-modifier-error);
+  color: var(--text-on-accent);
 }
 
 /* Settings styles */

@@ -3,23 +3,21 @@ import {
   Editor,
   MarkdownView,
   Modal,
-  moment,
   Notice,
-  Platform,
-  requestUrl
+  requestUrl,
+  moment
 } from 'obsidian'
 import { GridView, ThumbnailImage } from './renderer'
-import GooglePhotos from './main'
+import ImmichPlugin from './main'
 import { handlebarParse } from './handlebars'
-import { PickerSession } from 'photosApi'
 
 export class PhotosModal extends Modal {
-  plugin: GooglePhotos
+  plugin: ImmichPlugin
   gridView: GridView
   editor: Editor
   view: MarkdownView
 
-  constructor (app: App, plugin: GooglePhotos, editor: Editor, view: MarkdownView) {
+  constructor(app: App, plugin: ImmichPlugin, editor: Editor, view: MarkdownView) {
     super(app)
     this.plugin = plugin
     this.editor = editor
@@ -27,261 +25,185 @@ export class PhotosModal extends Modal {
   }
 
   /**
-   * Save a local thumbnail and insert the thumbnail plus a link back to the original Google Photos location
+   * Save a local thumbnail and insert the thumbnail plus a link back to the original Immich asset
    * @param event
    */
-  async insertImageIntoEditor (event: MouseEvent) {
+  async insertImageIntoEditor(event: MouseEvent) {
     try {
-      // Remove the photo grid and just show the loading spinner while we wait for the thumbnail to download
-      await this.gridView.resetGrid()
       const thumbnailImage = <ThumbnailImage>event.target
-      const src = thumbnailImage.baseUrl + `=w${this.plugin.settings.thumbnailWidth}-h${this.plugin.settings.thumbnailHeight}`
-      const noteFolder = this.view.file.path.split('/').slice(0, -1).join('/')
-      // Use the note folder or the user-specified folder from Settings
-      let thumbnailFolder = noteFolder
-      let linkPath = thumbnailImage.filename
-      switch (this.plugin.settings.locationOption) {
-        case 'specified':
-          thumbnailFolder = this.plugin.settings.locationFolder
-          // Set the Markdown image path to be the full specified path + filename
-          linkPath = thumbnailFolder + '/' + thumbnailImage.filename
-          break
-        case 'subfolder':
-          thumbnailFolder = noteFolder + '/' + this.plugin.settings.locationSubfolder
-          // Set the Markdown image path to be the subfolder + filename
-          linkPath = this.plugin.settings.locationSubfolder + '/' + thumbnailImage.filename
-          break
-      }
-      thumbnailFolder = thumbnailFolder.replace(/^\/+/, '').replace(/\/+$/, '') // remove any leading/trailing slashes
-      linkPath = encodeURI(linkPath)
-      // Check to see if the destination folder exists
-      const vault = this.view.app.vault
-      if (!await vault.adapter.exists(thumbnailFolder)) {
-        // Create the folder if not already existing. This works to any depth
-        await vault.createFolder(thumbnailFolder)
-      }
-      // Fetch the thumbnail from Google Photos
-      // Picker API requires OAuth authorization header
       const s = this.plugin.settings
-      const imageData = await requestUrl({ 
-        url: src,
-        headers: {
-          'Authorization': 'Bearer ' + s.accessToken
-        }
-      })
-      await this.view.app.vault.adapter.writeBinary(thumbnailFolder + '/' + thumbnailImage.filename, imageData.arrayBuffer)
       const cursorPosition = this.editor.getCursor()
-      const linkText = handlebarParse(this.plugin.settings.thumbnailMarkdown, {
-        local_thumbnail_link: linkPath,
-        google_photo_id: thumbnailImage.photoId,
-        google_photo_url: thumbnailImage.productUrl,
-        google_photo_desc: thumbnailImage.description || '', // Photo caption from Google Photos description text field
-        google_base_url: thumbnailImage.baseUrl,
-        taken_date: thumbnailImage.creationTime.format()
-      })
-      this.editor.replaceRange(linkText, cursorPosition)
-      // Move the cursor to the end of the thumbnail link after pasting
-      this.editor.setCursor({ line: cursorPosition.line, ch: cursorPosition.ch + linkText.length })
+
+      if (s.downloadImages) {
+        // Download mode: save image locally using Obsidian's attachment settings
+        const src = this.plugin.photosApi.getThumbnailUrl(thumbnailImage.photoId)
+
+        // Get Obsidian's attachment folder setting
+        // @ts-ignore - accessing internal Obsidian API
+        const attachmentFolder = this.app.vault.getConfig('attachmentFolderPath') || '.'
+        const activeFile = this.view.file
+
+        // Resolve attachment path based on Obsidian settings
+        let targetFolder = attachmentFolder
+        if (attachmentFolder === './') {
+          // Same folder as current note
+          targetFolder = activeFile.parent?.path || ''
+        } else if (attachmentFolder.startsWith('./')) {
+          // Relative to current note
+          const noteFolder = activeFile.parent?.path || ''
+          targetFolder = noteFolder + '/' + attachmentFolder.substring(2)
+        }
+        // else: absolute path from vault root
+
+        targetFolder = targetFolder.replace(/^\/+/, '').replace(/\/+$/, '')
+        const linkPath = targetFolder ? targetFolder + '/' + thumbnailImage.filename : thumbnailImage.filename
+
+        // Create folder if needed
+        if (targetFolder && !await this.app.vault.adapter.exists(targetFolder)) {
+          await this.app.vault.createFolder(targetFolder)
+        }
+
+        // Fetch and save image
+        const imageData = await requestUrl({
+          url: src,
+          headers: { 'x-api-key': s.immichApiKey }
+        })
+        await this.app.vault.adapter.writeBinary(
+          targetFolder ? targetFolder + '/' + thumbnailImage.filename : thumbnailImage.filename,
+          imageData.arrayBuffer
+        )
+
+        // Insert markdown with local path
+        const linkText = handlebarParse(s.thumbnailMarkdown, {
+          local_thumbnail_link: encodeURI(linkPath),
+          google_photo_id: thumbnailImage.photoId,
+          google_photo_url: thumbnailImage.productUrl,
+          google_photo_desc: thumbnailImage.description || '',
+          google_base_url: thumbnailImage.baseUrl,
+          immich_photo_id: thumbnailImage.photoId,
+          immich_photo_url: thumbnailImage.productUrl,
+          immich_photo_desc: thumbnailImage.description || '',
+          immich_base_url: thumbnailImage.baseUrl,
+          taken_date: thumbnailImage.creationTime.format()
+        })
+        this.editor.replaceRange(linkText, cursorPosition)
+        this.editor.setCursor({ line: cursorPosition.line, ch: cursorPosition.ch + linkText.length })
+      } else {
+        // Link-only mode: insert direct Immich URL
+        const imageUrl = thumbnailImage.productUrl // original URL
+        const linkText = handlebarParse(s.thumbnailMarkdown, {
+          local_thumbnail_link: imageUrl,
+          google_photo_id: thumbnailImage.photoId,
+          google_photo_url: thumbnailImage.productUrl,
+          google_photo_desc: thumbnailImage.description || '',
+          google_base_url: thumbnailImage.baseUrl,
+          immich_photo_id: thumbnailImage.photoId,
+          immich_photo_url: thumbnailImage.productUrl,
+          immich_photo_desc: thumbnailImage.description || '',
+          immich_base_url: thumbnailImage.baseUrl,
+          taken_date: thumbnailImage.creationTime.format()
+        })
+        this.editor.replaceRange(linkText, cursorPosition)
+        this.editor.setCursor({ line: cursorPosition.line, ch: cursorPosition.ch + linkText.length })
+      }
     } catch (e) {
-      console.log(e)
+      console.error('[Immich] Error inserting image:', e)
+      new Notice('Błąd podczas wstawiania zdjęcia: ' + (e as Error).message)
     }
-    this.close() // close the modal
+    this.close()
   }
 
-  onClose () {
+  onClose() {
     this.gridView?.destroy()
   }
 }
 
 export class PickerModal extends PhotosModal {
-  session: PickerSession | null = null
-  pollingInterval: NodeJS.Timeout | null = null
-  pickerWindow: Window | null = null
+  usedBaseUrl: string | null = null
 
-  async onOpen () {
+  async onOpen() {
     const { contentEl, modalEl } = this
-    
-    if (Platform.isDesktop) {
-      modalEl.addClass('google-photos-modal-grid')
-    }
+    modalEl.addClass('google-photos-modal-grid')
 
-    // Show loading message
-    contentEl.createEl('h2', { text: 'Google Photos Picker' })
-    const statusEl = contentEl.createEl('p', { text: 'Initializing photo picker...' })
-    const pickerEl = contentEl.createEl('div')
+    // Show loading message with spinner
+    contentEl.createEl('h2', { text: 'Immich' })
+    const loaderContainer = contentEl.createDiv('immich-loader-container')
+    const spinner = loaderContainer.createDiv('immich-spinner')
+    const statusEl = loaderContainer.createEl('p', { text: 'Ładowanie zdjęć z Immich...' })
 
     try {
-      // Create picker session
-      console.log('Creating picker session...')
-      this.session = await this.plugin.photosApi.createSession()
-      console.log('Session created:', this.session)
-      
-      statusEl.setText('Click the button below to open Google Photos and select your photos:')
-      
-      const openPickerBtn = pickerEl.createEl('button', {
-        text: 'Open Google Photos Picker',
-        cls: 'mod-cta'
-      })
-      
-      openPickerBtn.onclick = () => {
-        if (this.session) {
-          console.log('Opening picker with URI:', this.session.pickerUri)
-          // Open picker in new window/tab
-          this.pickerWindow = window.open(this.session.pickerUri, '_blank')
-          openPickerBtn.disabled = true
-          openPickerBtn.setText('Waiting for photo selection...')
-          statusEl.setText('Select your photos in the Google Photos window, then return here. This window will automatically detect when you\'re done.')
-          
-          // Start polling for completion
-          this.startPolling(statusEl)
+      // Try to get date from current note's front matter
+      let filterDate: string | undefined
+      const cache = this.app.metadataCache.getFileCache(this.view.file)
+      if (cache?.frontmatter) {
+        // Try common front matter keys for date (prefer title first)
+        const dateValue = cache.frontmatter.title || cache.frontmatter.created || cache.frontmatter.date
+        if (dateValue && typeof dateValue === 'string') {
+          const parsedDate = moment(dateValue, ['YYYY-MM-DD', 'YYYY-MM-DD HH:mm'], true)
+          if (parsedDate.isValid()) {
+            filterDate = parsedDate.format('YYYY-MM-DD')
+            console.log(`[Immich] Using date from front matter: ${filterDate}`)
+            statusEl.setText(`Ładowanie zdjęć z dnia ${filterDate}...`)
+          }
         }
       }
-      
-    } catch (error) {
-      console.error('Failed to create picker session:', error)
-      statusEl.setText('Error: ' + error.message)
-    }
-  }
 
-  startPolling (statusEl: HTMLParagraphElement) {
-    if (!this.session) return
+      // Load assets for the specific date
+      const { items, usedBaseUrl } = await this.plugin.photosApi.listRecentAssets(filterDate)
+      this.usedBaseUrl = usedBaseUrl
 
-    console.log('Starting polling for session:', this.session.id)
-    let pollCount = 0
-    
-    const poll = async () => {
-      try {
-        pollCount++
-        console.log(`Poll attempt ${pollCount} for session ${this.session!.id}`)
-        
-        const sessionStatus = await this.plugin.photosApi.getSession(this.session!.id)
-        console.log('Session status:', sessionStatus)
-        
-        if (sessionStatus.mediaItemsSet) {
-          // User has finished selecting photos
-          console.log('Media items set detected, stopping polling')
-          this.stopPolling()
-          statusEl.setText('Photos selected! Loading...')
-          await this.displaySelectedPhotos()
-        } else {
-          // Continue polling
-          console.log('Media items not set yet, continuing to poll...')
-          const pollInterval = this.parseDuration(sessionStatus.pollingConfig?.pollInterval || '5s')
-          console.log(`Next poll in ${pollInterval}ms`)
-          statusEl.setText(`Waiting for photo selection... (checked ${pollCount} times)`)
-          this.pollingInterval = setTimeout(poll, pollInterval)
+      // Remove loader
+      loaderContainer.remove()
+
+      if (items.length > 0) {
+        // Group photos by year
+        const photosByYear = new Map<number, typeof items>()
+        for (const item of items) {
+          const creationMoment = moment(item.mediaMetadata.creationTime)
+          const year = creationMoment.year()
+          console.log(`[Immich] Item: ${item.filename}, creationTime: ${item.mediaMetadata.creationTime}, year: ${year}`)
+          if (!photosByYear.has(year)) {
+            photosByYear.set(year, [])
+          }
+          photosByYear.get(year)!.push(item)
         }
-      } catch (error) {
-        console.error('Polling error:', error)
-        this.stopPolling()
-        statusEl.setText('Error checking photo selection status: ' + error.message)
-        new Notice('Error checking photo selection status: ' + error.message)
-      }
-    }
 
-    // Start first poll after a short delay
-    console.log('Starting initial poll in 3 seconds...')
-    this.pollingInterval = setTimeout(poll, 3000)
-  }
+        // Sort years descending
+        const sortedYears = Array.from(photosByYear.keys()).sort((a, b) => b - a)
 
-  stopPolling () {
-    if (this.pollingInterval) {
-      clearTimeout(this.pollingInterval)
-      this.pollingInterval = null
-      console.log('Polling stopped')
-    }
-  }
+        contentEl.createEl('p', { text: `Znaleziono ${items.length} zdjęć. Kliknij zdjęcie, aby wstawić do notatki:` })
 
-  parseDuration (duration: string): number {
-    // Parse duration string like "5s" or "30s" and return milliseconds
-    const match = duration.match(/^(\d+)s$/)
-    const seconds = match ? parseInt(match[1]) : 5
-    console.log(`Parsed duration "${duration}" as ${seconds} seconds`)
-    return seconds * 1000
-  }
+        // Create grid view for each year
+        for (const year of sortedYears) {
+          const yearSection = contentEl.createDiv('immich-year-section')
+          const yearCount = photosByYear.get(year)?.length || 0
+          const yearLabel = year === moment().year() ? `${year} (ten rok)` : `${year} (${moment().year() - year} lat temu)`
+          yearSection.createEl('h3', { text: yearLabel, cls: 'immich-year-header' })
 
-  async displaySelectedPhotos () {
-    if (!this.session) return
+          const gridContainer = yearSection.createDiv('immich-grid-container')
+          const gridView = new GridView({
+            scrollEl: this.modalEl,
+            plugin: this.plugin,
+            onThumbnailClick: event => this.insertImageIntoEditor(event)
+          })
 
-    const { contentEl } = this
-    contentEl.empty()
-    
-    contentEl.createEl('h2', { text: 'Selected Photos' })
-    const statusEl = contentEl.createEl('p', { text: 'Loading selected photos...' })
-    
-    try {
-      console.log('Fetching picked media items for session:', this.session.id)
-      // Get picked media items
-      const mediaItemsResponse = await this.plugin.photosApi.listPickedMediaItems(this.session.id)
-      console.log('Media items response:', mediaItemsResponse)
-      
-      // Debug the condition check
-      console.log('mediaItemsResponse.mediaItems exists?', !!mediaItemsResponse.mediaItems)
-      console.log('mediaItemsResponse.mediaItems type:', typeof mediaItemsResponse.mediaItems)
-      console.log('mediaItemsResponse.mediaItems length:', mediaItemsResponse.mediaItems?.length)
-      console.log('Is array?', Array.isArray(mediaItemsResponse.mediaItems))
-      console.log('Length > 0?', (mediaItemsResponse.mediaItems?.length || 0) > 0)
-      
-      if (mediaItemsResponse.mediaItems && mediaItemsResponse.mediaItems.length > 0) {
-        console.log(`✅ Found ${mediaItemsResponse.mediaItems.length} selected photos`)
-        statusEl.setText(`Found ${mediaItemsResponse.mediaItems.length} selected photo(s). Click on a photo to insert it into your note:`)
-        
-        // Create grid view for selected photos
-        this.gridView = new GridView({
-          scrollEl: this.modalEl,
-          plugin: this.plugin,
-          onThumbnailClick: event => this.insertImageIntoEditor(event)
-        })
-
-        // Convert picked items to compatible format and display
-        const compatibleItems = mediaItemsResponse.mediaItems.map(item => 
-          this.plugin.photosApi.convertPickedMediaItem(item)
-        )
-        
-        console.log('Compatible items created:', compatibleItems)
-        
-        await this.gridView.appendThumbnailsToElement(
-          this.gridView.containerEl, 
-          compatibleItems, 
-          event => this.insertImageIntoEditor(event)
-        )
-        
-        contentEl.appendChild(this.gridView.containerEl)
+          await gridView.appendThumbnailsToElement(gridView.containerEl, photosByYear.get(year)!, event => this.insertImageIntoEditor(event))
+          gridContainer.appendChild(gridView.containerEl)
+        }
       } else {
-        console.log('❌ Condition failed - debugging why:')
-        console.log('- mediaItemsResponse.mediaItems:', mediaItemsResponse.mediaItems)
-        console.log('- Truthy check:', !!mediaItemsResponse.mediaItems)
-        console.log('- Length:', mediaItemsResponse.mediaItems?.length)
-        console.log('- Length > 0:', (mediaItemsResponse.mediaItems?.length || 0) > 0)
-        console.log('Full response:', mediaItemsResponse)
-        statusEl.setText('No photos were selected. You can close this window and try again.')
+        contentEl.createEl('p', { text: 'Brak zdjęć do wyświetlenia. Dodaj zdjęcia w Immich i spróbuj ponownie.' })
       }
-      
     } catch (error) {
-      console.error('Failed to load selected photos:', error)
-      statusEl.setText('Error loading selected photos: ' + error.message)
+      console.error('Failed to load Immich assets:', error)
+      loaderContainer.remove()
+      contentEl.createEl('p', { text: 'Błąd podczas ładowania zdjęć: ' + (error as Error).message })
     }
   }
-
-  onClose () {
-    this.stopPolling()
-    
-    // Clean up session
-    if (this.session) {
-      this.plugin.photosApi.deleteSession(this.session.id).catch(error => {
-        console.error('Failed to delete session:', error)
-      })
-    }
-    
-    // Close picker window if still open
-    if (this.pickerWindow && !this.pickerWindow.closed) {
-      this.pickerWindow.close()
-    }
-    
+  onClose() {
     super.onClose()
   }
 }
 
-function lowerCaseFirstLetter (string: string) {
+function lowerCaseFirstLetter(string: string) {
   return string.charAt(0).toLowerCase() + string.slice(1)
 }

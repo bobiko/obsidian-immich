@@ -1,7 +1,7 @@
-import { moment } from 'obsidian'
-import GooglePhotos from './main'
+import { moment, requestUrl } from 'obsidian'
+import ImmichPlugin from './main'
 
-export type GooglePhotosMediaItem = {
+export type ImmichMediaItem = {
   id: string,
   description: string,
   productUrl: string,
@@ -13,176 +13,160 @@ export type GooglePhotosMediaItem = {
   filename: string
 }
 
-// Picker API types
-export type PickerSession = {
-  id: string,
-  pickerUri: string,
-  pollingConfig: {
-    pollInterval: string,
-    timeoutIn: string
-  },
-  mediaItemsSet: boolean
-}
-
-export type PickedMediaItem = {
-  id: string,
-  mediaFile: {
-    baseUrl: string,
-    mimeType: string,
-    filename: string
-  },
-  description?: string,
-  mediaMetadata?: {
-    creationTime: string
-  }
-}
-
-export type PickedMediaItemsResponse = {
-  mediaItems: PickedMediaItem[],
-  nextPageToken?: string
+// Minimal Immich asset type used by this plugin
+export type ImmichAsset = {
+  id: string
+  type?: string
+  originalFileName?: string
+  exifInfo?: { dateTimeOriginal?: string }
+  createdAt?: string
+  localDateTime?: string
+  isFavorite?: boolean
+  duration?: string
+  fileCreatedAt?: string
+  fileModifiedAt?: string
+  checksum?: string
 }
 
 export default class PhotosApi {
-  plugin: GooglePhotos
+  plugin: ImmichPlugin
 
-  constructor (plugin: GooglePhotos) {
+  constructor(plugin: ImmichPlugin) {
     this.plugin = plugin
   }
 
-  /**
-   * Make an authenticated request to Google Photos Picker API
-   *
-   * @param {string} endpoint - Endpoint including the API version: '/v1' etc
-   * @param {object} [params] - Optional parameters
-   * @returns {Promise<object>}
-   *
-   * @throws Will throw an error if the input is malformed, or if the user is not authenticated
-   */
-  async request (endpoint: string, params: any = {}): Promise<object> {
-    // Check to make sure we have a valid access token
+  private get headers() {
+    return {
+      'Content-Type': 'application/json',
+      'x-api-key': this.plugin.settings.immichApiKey || ''
+    }
+  }
+
+  private get baseUrls(): string[] {
     const s = this.plugin.settings
-    if (!s.accessToken || moment() > moment(s.expires)) {
-      if (!await this.plugin.oauth.authenticate()) {
-        throw new Error('Unauthenticated')
-      }
-    }
-
-    console.log(`Making request to: https://photospicker.googleapis.com${endpoint}`)
-    console.log('Request params:', params)
-
-    // Make the authenticated request to Photos Picker API
-    const resp = await fetch(
-      'https://photospicker.googleapis.com' + endpoint,
-      Object.assign({
-        method: 'GET',
-        headers: {
-          Authorization: 'Bearer ' + s.accessToken,
-          'Content-Type': 'application/json'
-        }
-      }, params))
-      
-    console.log(`Response status: ${resp.status}`)
-    
-    if (resp.status === 200) {
-      const data = await resp.json()
-      console.log('Response data:', data)
-      return data
-    } else if (resp.status === 400) { // Malformed input
-      const errorText = await resp.text()
-      console.error('400 error response:', errorText)
-      throw new Error('⚠ Malformed input. Please check the request.')
-    } else if (resp.status === 401) { // Unauthenticated
-      console.log('401 error - attempting re-authentication')
-      if (await this.plugin.oauth.authenticate()) {
-        throw new Error('Retry')
-      } else {
-        throw new Error('Unauthenticated')
-      }
-    } else if (resp.status === 403) { // Permission denied
-      const errorText = await resp.text()
-      console.error('403 error response:', errorText)
-      throw new Error('Permission denied. Please re-authenticate with Google Photos.')
+    const urls: string[] = []
+    const local = s.immichLocalUrl?.trim()
+    const remote = s.immichRemoteUrl?.trim()
+    if (s.preferLocal) {
+      if (local) urls.push(local)
+      if (remote) urls.push(remote)
     } else {
-      const errorText = await resp.text()
-      console.error(`${resp.status} error response:`, errorText)
-      throw new Error('Unknown status ' + resp.status)
+      if (remote) urls.push(remote)
+      if (local) urls.push(local)
     }
+    return urls.filter(Boolean)
   }
 
   /**
-   * Create a new picker session
-   * @returns {Promise<PickerSession>}
+   * Make an authenticated request to Immich API (tries local, then remote)
    */
-  async createSession (): Promise<PickerSession> {
-    console.log('Creating new picker session...')
-    return await this.request('/v1/sessions', {
-      method: 'POST',
-      body: JSON.stringify({}) // Empty body for session creation
-    }) as PickerSession
-  }
-
-  /**
-   * Get session status
-   * @param {string} sessionId
-   * @returns {Promise<PickerSession>}
-   */
-  async getSession (sessionId: string): Promise<PickerSession> {
-    console.log(`Getting session status for: ${sessionId}`)
-    return await this.request(`/v1/sessions/${sessionId}`) as PickerSession
-  }
-
-  /**
-   * List picked media items from a session
-   * @param {string} sessionId
-   * @param {string} [pageToken]
-   * @returns {Promise<PickedMediaItemsResponse>}
-   */
-  async listPickedMediaItems (sessionId: string, pageToken?: string): Promise<PickedMediaItemsResponse> {
-    console.log(`Listing picked media items for session: ${sessionId}`)
-    let url = `/v1/mediaItems?sessionId=${sessionId}`
-    if (pageToken) {
-      url += `&pageToken=${pageToken}`
+  async request<T = unknown>(endpoint: string, init: RequestInit = {}): Promise<{ data: T, usedBaseUrl: string }> {
+    const urls = this.baseUrls
+    if (urls.length === 0) {
+      throw new Error('Immich base URL is not configured')
     }
-    return await this.request(url) as PickedMediaItemsResponse
+    let lastErr: any
+    for (const base of urls) {
+      const url = base + endpoint
+      try {
+        const mergedHeaders = { ...this.headers, ...(init.headers as any || {}) }
+        const resp = await requestUrl({
+          url,
+          method: (init.method || 'GET') as any,
+          headers: mergedHeaders,
+          body: init.body as any
+        })
+        const status = resp.status
+        console.log(`[Immich] Got ${status} from ${base}`)
+        if (status >= 200 && status < 300) {
+          const ct = resp.headers['content-type'] || ''
+          const data = ct.includes('application/json') ? resp.json : resp.text
+          console.log(`[Immich] Success using ${base}`)
+          return { data: data as T, usedBaseUrl: base }
+        }
+        const errorText = resp.text
+        if (status === 401 || status === 403) {
+          throw new Error(`Immich auth error (${status}): ${errorText}`)
+        }
+        console.warn(`[Immich] Got ${status}, will try next URL`)
+        lastErr = new Error(`Immich request failed ${status} at ${url}`)
+      } catch (e) {
+        console.error(`[Immich] Exception at ${base}:`, e)
+        lastErr = e
+      }
+    }
+    throw lastErr || new Error('Immich request failed')
   }
 
   /**
-   * Delete a session (cleanup)
-   * @param {string} sessionId
+   * List assets for a specific date using memories endpoint
+   * Filters by localDateTime to get photos from that date across multiple years
    */
-  async deleteSession (sessionId: string): Promise<void> {
-    console.log(`Deleting session: ${sessionId}`)
-    await this.request(`/v1/sessions/${sessionId}`, {
-      method: 'DELETE'
+  async listRecentAssets(targetDate?: string): Promise<{ items: ImmichMediaItem[], usedBaseUrl: string }> {
+    // Use the provided date or today's date
+    const dateToFetch = targetDate || moment().format('YYYY-MM-DD')
+    const endpoint = `/api/memories?for=${dateToFetch}`
+
+    console.log(`[Immich] Fetching memories for ${dateToFetch}`)
+    const { data, usedBaseUrl } = await this.request<any>(endpoint, { method: 'GET' })
+
+    // Response is array of memory objects, each with assets array
+    let assetList: ImmichAsset[] = []
+    if (Array.isArray(data)) {
+      // Flatten all assets from all memories for this date
+      for (const memory of data) {
+        if (memory.assets && Array.isArray(memory.assets)) {
+          assetList.push(...memory.assets)
+        }
+      }
+    }
+
+    // Filter by localDateTime to only get photos from this specific month/day (any year)
+    const targetMoment = moment(dateToFetch, 'YYYY-MM-DD')
+    const targetMonth = targetMoment.month()
+    const targetDay = targetMoment.date()
+
+    const filtered = assetList.filter(asset => {
+      // Use localDateTime if available, fallback to other date fields
+      const dateStr = asset.localDateTime || asset.exifInfo?.dateTimeOriginal || asset.createdAt || asset.fileCreatedAt
+      if (!dateStr) return false
+
+      const assetMoment = moment(dateStr)
+      if (!assetMoment.isValid()) return false
+
+      // Match month and day regardless of year
+      return assetMoment.month() === targetMonth && assetMoment.date() === targetDay
     })
+
+    const items = filtered.map(a => this.convertImmichAsset(a, usedBaseUrl))
+    console.log(`[Immich] Successfully loaded ${items.length} assets for ${dateToFetch}`)
+    return { items, usedBaseUrl }
   }
 
-  /**
-   * Convert PickedMediaItem to GooglePhotosMediaItem for compatibility
-   * @param {any} pickedItem - Using any since API structure may vary
-   * @returns {GooglePhotosMediaItem}
-   */
-  convertPickedMediaItem (pickedItem: any): GooglePhotosMediaItem {
-    console.log('Converting picked media item:', pickedItem)
-    
-    // Handle different possible structures from the API
-    const baseUrl = pickedItem.mediaFile?.baseUrl || pickedItem.baseUrl || ''
-    const mimeType = pickedItem.mediaFile?.mimeType || pickedItem.mimeType || 'image/jpeg'
-    const filename = pickedItem.mediaFile?.filename || pickedItem.filename || `photo-${pickedItem.id}.jpg`
-    
-    const converted = {
-      id: pickedItem.id,
-      description: pickedItem.description || '',
-      productUrl: '', // Not available in Picker API
-      baseUrl: baseUrl,
-      mimeType: mimeType,
-      mediaMetadata: {
-        creationTime: pickedItem.mediaMetadata?.creationTime || moment().toISOString()
-      },
-      filename: filename
+  convertImmichAsset(asset: ImmichAsset, baseUrl: string): ImmichMediaItem {
+    // Use localDateTime as primary source, fallback to other date fields
+    const taken = asset.localDateTime || asset.exifInfo?.dateTimeOriginal || asset.createdAt || asset.fileCreatedAt || moment().toISOString()
+    const filename = asset.originalFileName || `immich-${asset.id}.jpg`
+    return {
+      id: asset.id,
+      description: '',
+      productUrl: this.getOriginalUrl(asset.id, baseUrl),
+      baseUrl: this.getOriginalUrl(asset.id, baseUrl),
+      mimeType: 'image/jpeg',
+      mediaMetadata: { creationTime: taken },
+      filename
     }
-    
-    console.log('Converted media item:', converted)
-    return converted
+  }
+
+  getThumbnailUrl(assetId: string, baseUrl?: string, size: 'thumbnail' | 'preview' = 'thumbnail'): string {
+    // Correct Immich thumbnail endpoint: /api/assets/{id}/thumbnail
+    const used = baseUrl || this.baseUrls[0]
+    return `${used}/api/assets/${assetId}/thumbnail?size=${size}`
+  }
+
+  getOriginalUrl(assetId: string, baseUrl?: string): string {
+    // Correct Immich original file endpoint: /api/assets/{id}/original
+    const used = baseUrl || this.baseUrls[0]
+    return `${used}/api/assets/${assetId}/original`
   }
 }

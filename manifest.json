@@ -1,10 +1,10 @@
 {
-	"id": "google-photos",
-	"name": "Google Photos",
-	"version": "2.0.0",
-	"minAppVersion": "0.15.0",
-	"description": "Embed Google Photos images using the new Picker API (Legacy Library API features removed)",
-	"author": "Alan Grainger",
-	"authorUrl": "https://github.com/alangrainger",
-	"isDesktopOnly": false
+    "id": "immich",
+    "name": "Immich",
+    "version": "1.0.0",
+    "minAppVersion": "0.15.0",
+    "description": "Insert photos from your Immich server. Supports separate local and remote base URLs and API key authentication.",
+    "author": "Bobiko",
+    "authorUrl": "https://github.com/bobiko",
+    "isDesktopOnly": false
 }

@@ -1,34 +1,19 @@
-import { MarkdownView, Plugin, Editor, moment, TFile, Notice } from 'obsidian'
+import { MarkdownView, Plugin, Editor, moment, TFile } from 'obsidian'
 import PhotosApi from './photosApi'
-import OAuth from './oauth'
-import { GooglePhotosSettingTab, GooglePhotosSettings, DEFAULT_SETTINGS, GetDateFromOptions } from './settings'
+import { ImmichSettingTab, ImmichSettings, DEFAULT_SETTINGS, GetDateFromOptions } from './settings'
 import { PickerModal } from './photoModal'
 import CodeblockProcessor from './codeblockProcessor'
 
-export default class GooglePhotos extends Plugin {
-  settings: GooglePhotosSettings
+export default class ImmichPlugin extends Plugin {
+  settings: ImmichSettings
   photosApi: PhotosApi
-  oauth: OAuth
 
-  async onload () {
+  async onload() {
     await this.loadSettings()
 
     this.photosApi = new PhotosApi(this)
-    this.oauth = new OAuth(this)
 
-    this.addSettingTab(new GooglePhotosSettingTab(this.app, this))
-
-    // Protocol handler
-    this.registerObsidianProtocolHandler('google-photos', async data => {
-      if (data.code) {
-        console.log(data.code)
-        // This is the backup method in case the local HTTP server doesn't work for that user's device
-        const res = await this.oauth.processCode(data.code)
-        if (res) {
-          new Notice('Successfully connected to Google Photos')
-        }
-      }
-    })
+    this.addSettingTab(new ImmichSettingTab(this.app, this))
 
     // Codeblock handler
     this.registerMarkdownCodeBlockProcessor('photos', (source, el, context) => {
@@ -38,9 +23,17 @@ export default class GooglePhotos extends Plugin {
       }
     })
 
+    // Immich memories codeblock: ```immichMemories```
+    this.registerMarkdownCodeBlockProcessor('immichMemories', (source, el, context) => {
+      const file = app.vault.getAbstractFileByPath(context.sourcePath)
+      if (file instanceof TFile) {
+        new CodeblockProcessor(this, source, el, file)
+      }
+    })
+
     this.addCommand({
-      id: 'insert-google-photo',
-      name: 'Insert Google Photo',
+      id: 'insert-immich-photo',
+      name: 'Insert Immich Photo',
       editorCallback: (editor: Editor, view: MarkdownView) => {
         const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView)
         if (markdownView) {
@@ -50,16 +43,14 @@ export default class GooglePhotos extends Plugin {
     })
   }
 
-  onunload () {
-    // Remove the OAuth HTTP server
-    this.oauth.httpServer?.close()
+  onunload() {
   }
 
-  async loadSettings () {
+  async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
   }
 
-  async saveSettings () {
+  async saveSettings() {
     await this.saveData(this.settings)
   }
 
@@ -68,7 +59,7 @@ export default class GooglePhotos extends Plugin {
    * This is kept for compatibility with existing settings but is no longer used for photo filtering
    * @param file
    */
-  getNoteDate (file: TFile): moment.Moment {
+  getNoteDate(file: TFile): moment.Moment {
     if (this.settings.getDateFrom === GetDateFromOptions.NOTE_TITLE) {
       // Get date from note title
       return moment(file.basename, this.settings.getDateFromFormat, true)

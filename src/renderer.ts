@@ -1,7 +1,7 @@
 import { moment, Notice, requestUrl } from 'obsidian'
-import GooglePhotos from './main'
 import { Moment } from 'moment'
-import { GooglePhotosMediaItem } from 'photosApi'
+import ImmichPlugin from './main'
+import { ImmichMediaItem } from 'photosApi'
 
 export class ThumbnailImage extends Image {
   photoId: string
@@ -13,9 +13,9 @@ export class ThumbnailImage extends Image {
 }
 
 export default class Renderer {
-  plugin: GooglePhotos
+  plugin: ImmichPlugin
 
-  constructor (plugin: GooglePhotos) {
+  constructor(plugin: ImmichPlugin) {
     this.plugin = plugin
   }
 }
@@ -26,7 +26,7 @@ export class GridView extends Renderer {
   scrollEl: HTMLElement
   isLoading = false
 
-  constructor (options: { scrollEl: HTMLElement, plugin: GooglePhotos, onThumbnailClick: (event: MouseEvent) => void }) {
+  constructor(options: { scrollEl: HTMLElement, plugin: ImmichPlugin, onThumbnailClick: (event: MouseEvent) => void }) {
     super(options.plugin)
     this.scrollEl = options.scrollEl
     this.onThumbnailClick = options.onThumbnailClick
@@ -37,14 +37,14 @@ export class GridView extends Renderer {
   /**
    * Remove all the items from the thumbnails list
    */
-  async resetGrid () {
+  async resetGrid() {
     this.containerEl.innerHTML = '<p>Downloading thumbnail...</p>'
   }
 
   /**
    * Show a loading spinner
    */
-  async setLoading () {
+  async setLoading() {
     // Show loading spinner
     this.isLoading = true
     this.containerEl.innerHTML = '<p>Loading photos...</p>'
@@ -56,17 +56,17 @@ export class GridView extends Renderer {
    * @param {array} thumbnails
    * @param {function} onclick
    */
-  async appendThumbnailsToElement (el: HTMLElement, thumbnails: GooglePhotosMediaItem[], onclick: (event: MouseEvent) => void) {
+  async appendThumbnailsToElement(el: HTMLElement, thumbnails: ImmichMediaItem[], onclick: (event: MouseEvent) => void) {
     for (const mediaItem of thumbnails || []) {
       // Image element
       const img = new ThumbnailImage()
       const settings = this.plugin.settings
-      
-      // For Picker API, we need to fetch the image with authentication and create a blob URL
+
+      // For Immich, fetch the preview thumbnail with API key and create a blob URL
       try {
-        const imageUrl = mediaItem.baseUrl + '=w500-h130'
-        console.log(`Fetching authenticated image: ${imageUrl}`)
-        
+        const imageUrl = this.plugin.photosApi.getThumbnailUrl(mediaItem.id)
+        console.log(`Fetching Immich preview image: ${imageUrl}`)
+
         // Create a placeholder image while loading
         img.src = 'data:image/svg+xml;base64,' + btoa(`
           <svg width="500" height="130" xmlns="http://www.w3.org/2000/svg">
@@ -74,7 +74,7 @@ export class GridView extends Renderer {
             <text x="250" y="70" text-anchor="middle" fill="#666" font-family="Arial" font-size="14">Loading...</text>
           </svg>
         `)
-        
+
         // Set other properties immediately
         img.photoId = mediaItem.id
         img.baseUrl = mediaItem.baseUrl
@@ -84,30 +84,29 @@ export class GridView extends Renderer {
         img.filename = img.creationTime.format(settings.filename)
         img.onclick = onclick
         img.classList.add('google-photos-grid-thumbnail')
-        
+
         // Add to DOM first so user sees the placeholder
         el.appendChild(img)
-        
-        // Fetch the actual image with authentication
-        // Picker API requires OAuth authorization header
+
+        // Fetch the actual image with Immich API key
         const s = this.plugin.settings
-        const imageData = await requestUrl({ 
+        const imageData = await requestUrl({
           url: imageUrl,
           headers: {
-            'Authorization': 'Bearer ' + s.accessToken
+            'x-api-key': s.immichApiKey
           }
         })
-        
+
         // Create blob URL and update image
         const blob = new Blob([imageData.arrayBuffer], { type: 'image/jpeg' })
         const blobUrl = URL.createObjectURL(blob)
         img.src = blobUrl
-        
+
         // Clean up blob URL when image is removed from DOM
         img.addEventListener('remove', () => {
           URL.revokeObjectURL(blobUrl)
         })
-        
+
       } catch (error) {
         console.error('Failed to load image:', error)
         img.src = 'data:image/svg+xml;base64,' + btoa(`
@@ -121,7 +120,7 @@ export class GridView extends Renderer {
     this.isLoading = false
   }
 
-  destroy () {
+  destroy() {
     // Clean up any blob URLs
     const images = this.containerEl.querySelectorAll('img')
     images.forEach(img => {

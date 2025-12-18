@@ -1,46 +1,114 @@
-# Google Photos for Obsidian
+# Immich for Obsidian
 
-## 📢 Maintenance mode - looking for new maintainer
+A plugin to insert photos from your [Immich](https://immich.app/) server into your [Obsidian](https://obsidian.md/) notes.
 
-I am now using [Immich](https://immich.app/) instead of Google Photos, which I strongly recommend to everyone.
-
-It's only a matter of time before Google sunsets their photos app, or [deletes your account with no recourse](https://www.koffellaw.com/blog/google-ai-technology-flags-dad-who-took-photos-o/) and all your photos are gone just like that. Just check out [all the other projects they have killed](https://killedbygoogle.com/).
-
-Due to this, this plugin is now in maintenance mode. If you are interested in taking over this project please let me know.
-
-Here's a guide for [quick inserting of images from Immich](https://obsidian.alan.gr/obsidian-guides/insert-images-from-immich) into your notes.
-
----
-
-A plugin to embed photos from Google Photos into your [Obsidian](https://obsidian.md/) notes using the Google Photos Picker.
+> **Note**: This is a fork of [obsidian-google-photos](https://github.com/alangrainger/obsidian-google-photos), adapted to work with Immich instead of Google Photos.
 
 ## Features
 
-- ✅ **Insert individual photos** using the Google Photos picker
-- ✅ **Automatically download and save thumbnails** locally  
-- ✅ **Link back to original photos** in Google Photos
-- ✅ **Customizable image templates** and filenames
-- ✅ **Flexible file organization** with configurable save locations
+-   📸 Insert photos from your Immich server into Obsidian notes
+-   🔗 Automatic fallback between local and remote URLs
+-   🔑 API key authentication (no OAuth needed)
+-   📅 Photos grouped by year - see your memories from past years
+-   📥 Download photos locally or link directly to Immich
+-   🎯 Automatic date detection from note front matter
+
+## Installation
+
+1. Install the plugin in Obsidian Community Plugins (or place files in `.obsidian/plugins/immich/`)
+2. Enable the plugin
+3. Configure your Immich server details in Settings
+
+## Setup
+
+1. **Get your Immich API Key**:
+
+    - Open your Immich server
+    - Go to Profile → API Keys
+    - Create a new API key
+
+2. **Configure in Obsidian**:
+
+    - Settings → Community Plugins → Immich
+    - **Lokalny adres URL (Immich)**: Your local URL (e.g. `http://192.168.1.10:2283`)
+    - **Zdalny adres URL (Immich)**: Your remote URL (e.g. `https://photos.example.com`)
+    - **Immich API Key**: Paste your API key
+    - **Preferuj lokalny adres**: Toggle to try local first, then fallback to remote
+
+3. **Choose how to insert photos**:
+    - **Pobierać zdjęcia lokalnie** (ON): Downloads photos to your vault
+    - **Pobierać zdjęcia lokalnie** (OFF): Links directly to Immich
+
+## Usage
+
+1. Open your Obsidian note
+2. Run command: "Insert Immich Photo"
+3. The modal shows photos from today's date (detected from note's front matter)
+4. Photos are grouped by year - see memories from past years
+5. Click a photo to insert it into your note
+
+### Codeblock: immichMemories
+
+Embed memories for the note's date (from front matter `created`/`date`/`title`):
+
+````markdown
+```immichMemories
+
+```
+````
+
+````
+
+Photos load from that calendar day across years and group by year. Click a photo to insert a link to Immich.
+
+## Front Matter
+
+The plugin automatically detects the date from your note's front matter:
+
+```yaml
+---
+created: 2025-12-18
+title: My Daily Note
+---
+````
+
+The plugin will show all photos taken on December 18th from any year. Supported front matter keys (precedence): `title`, `created`, `date`
+
+---
+
+## Legacy: Google Photos Version
+
+This plugin was originally created for Google Photos. The original documentation is below for historical reference.
+
+## Features
+
+-   ✅ **Insert individual photos** using the Google Photos picker
+-   ✅ **Automatically download and save thumbnails** locally
+-   ✅ **Link back to original photos** in Google Photos
+-   ✅ **Customizable image templates** and filenames
+-   ✅ **Flexible file organization** with configurable save locations
 
 ## Important Changes Due to Google's API Updates
 
 **What's New:**
-- Uses Google's official Picker API for photo selection
-- Manual photo selection through Google Photos interface
-- Secure, user-controlled photo access
+
+-   Uses Google's official Picker API for photo selection
+-   Manual photo selection through Google Photos interface
+-   Secure, user-controlled photo access
 
 **What's No Longer Available:**
-- ~~Date filtering (daily photos, note date queries)~~ - **Removed**
-- ~~Album browsing~~ - **Removed**  
-- ~~Automatic photo queries~~ - **Removed**
-- ~~Codeblock galleries~~ - **Removed**
+
+-   ~~Date filtering (daily photos, note date queries)~~ - **Removed**
+-   ~~Album browsing~~ - **Removed**
+-   ~~Automatic photo queries~~ - **Removed**
+-   ~~Codeblock galleries~~ - **Removed**
 
 ## How it works
 
 This plugin uses the Google Photos Picker API. When you want to insert photos:
 
 1. Run the "Insert Google Photo" command in Obsidian
-2. Click "Open Google Photos Picker" 
+2. Click "Open Google Photos Picker"
 3. Select your photos in the Google Photos interface
 4. Selected photos appear in Obsidian - click to insert them
 5. Plugin automatically downloads thumbnails and creates markdown links
@@ -48,10 +116,11 @@ This plugin uses the Google Photos Picker API. When you want to insert photos:
 ## Setup
 
 Follow the **[Picker API Setup Guide](docs/Setup-PickerAPI.md)** for detailed instructions on:
-- Creating a Google Cloud project
-- Enabling the Photos Library API
-- Configuring OAuth credentials
-- Setting up the plugin
+
+-   Creating a Google Cloud project
+-   Enabling the Photos Library API
+-   Configuring OAuth credentials
+-   Setting up the plugin
 
 ## Usage
 
@@ -59,7 +128,7 @@ Follow the **[Picker API Setup Guide](docs/Setup-PickerAPI.md)** for detailed in
 
 1. Place your cursor where you want to insert a photo
 2. Open command palette (`Cmd/Ctrl + P`)
-3. Run **"Insert Google Photo"** 
+3. Run **"Insert Google Photo"**
 4. Click **"Open Google Photos Picker"**
 5. Select photos in Google Photos
 6. Click on any photo in the selection grid to insert it
@@ -69,30 +138,32 @@ Follow the **[Picker API Setup Guide](docs/Setup-PickerAPI.md)** for detailed in
 In Settings, you can customize the markdown template using these variables:
 
 ```markdown
-[![]({{local_thumbnail_link}})]({{google_photo_url}}) 
+[![]({{local_thumbnail_link}})]({{google_photo_url}})
 ```
 
 Available variables:
-- `{{local_thumbnail_link}}` - Path to locally saved thumbnail
-- `{{google_photo_url}}` - URL to original Google Photo  
-- `{{google_photo_desc}}` - Photo description/caption
-- `{{taken_date}}` - Date photo was taken
-- `{{google_base_url}}` - Advanced: Direct image URL
-- `{{google_photo_id}}` - Advanced: Google's photo ID
+
+-   `{{local_thumbnail_link}}` - Path to locally saved thumbnail
+-   `{{google_photo_url}}` - URL to original Google Photo
+-   `{{google_photo_desc}}` - Photo description/caption
+-   `{{taken_date}}` - Date photo was taken
+-   `{{google_base_url}}` - Advanced: Direct image URL
+-   `{{google_photo_id}}` - Advanced: Google's photo ID
 
 ### File Organization
 
 Configure where thumbnails are saved:
-- **Same folder as note** - Keeps photos with your notes
-- **Subfolder** - Organizes photos in a dedicated subfolder  
-- **Specific folder** - Centralized photo storage location
+
+-   **Same folder as note** - Keeps photos with your notes
+-   **Subfolder** - Organizes photos in a dedicated subfolder
+-   **Specific folder** - Centralized photo storage location
 
 ## Migration from Previous Version
 
 If you used this plugin before the API migration:
 
 1. **Re-authenticate** - You'll need to set up new API credentials
-2. **Replace codeblocks** - Remove old `````photos` codeblocks 
+2. **Replace codeblocks** - Remove old `````photos` codeblocks
 3. **Update workflow** - Use manual picker instead of automatic queries
 
 Legacy codeblocks will show helpful migration messages.
@@ -100,17 +171,21 @@ Legacy codeblocks will show helpful migration messages.
 ## Troubleshooting
 
 ### Authentication Issues
-- Ensure you've added yourself as a test user in OAuth consent screen
-- Verify redirect URI is exactly: `http://localhost:51894/google-photos`
-- Clear browser cookies and try authentication again
 
-### Picker Not Opening  
-- Check that Google Photos Library API is enabled in your project
-- Verify your Client ID and Secret are correct
-- Check browser console for CORS or network errors
+-   Ensure you've added yourself as a test user in OAuth consent screen
+-   Verify redirect URI is exactly: `http://localhost:51894/google-photos`
+-   Clear browser cookies and try authentication again
+
+### Picker Not Opening
+
+-   Check that Google Photos Library API is enabled in your project
+-   Verify your Client ID and Secret are correct
+-   Check browser console for CORS or network errors
 
 ### "Connection Refused" Error
+
 If localhost connection fails:
+
 1. Copy the error page URL
 2. Replace `http://localhost:51894/` with `obsidian://`
 3. Navigate to the modified URL to complete authentication
@@ -163,7 +238,7 @@ You can use template variables to change the way the photo is imported / inserte
 The default format is as follows, which will add a thumbnail image which links back to the original Google Photo URL:
 
 ```markdown
-[![]({{local_thumbnail_link}})]({{google_photo_url}}) 
+[![]({{local_thumbnail_link}})]({{google_photo_url}})
 ```
 
 If you want to bring across the description text field from your photos, you could add it as text following the photo like this:
@@ -189,8 +264,8 @@ If you want to style or hide the title, the CSS class is `.google-photos-album-t
 
 Points of note:
 
-- It shows only your most recently used albums. This should be enough to get started, and I hope to update it in the future so it can fetch more of that list.
-- Clicking on the photos doesn't do anything. I'd be interested to hear feedback on what it _should_ do, in an ideal world. Please [join the conversation here](https://github.com/alangrainger/obsidian-google-photos/issues/5).
+-   It shows only your most recently used albums. This should be enough to get started, and I hope to update it in the future so it can fetch more of that list.
+-   Clicking on the photos doesn't do anything. I'd be interested to hear feedback on what it _should_ do, in an ideal world. Please [join the conversation here](https://github.com/alangrainger/obsidian-google-photos/issues/5).
 
 ## Codeblocks
 
@@ -200,10 +275,11 @@ You can use codeblocks to insert galleries of photos:
 
 This is especially useful to put in your daily note template, and it will show the photos just from that daily note date. You can configure the settings to fetch the date from the note title or a frontmatter property.
 
-```
+````
 ```photos
 notedate
-```
+````
+
 ```
 
 ### Photos from today
@@ -211,9 +287,11 @@ notedate
 This will show photos from today - the current live date.
 
 ```
+
 ```photos
 today
 ```
+
 ```
 
 ### Advanced codeblock usage
@@ -225,6 +303,7 @@ https://developers.google.com/photos/library/reference/rest/v1/mediaItems/search
 For example, if you wanted to show photos of food taken on every April 1st, you would use:
 
 ```
+
 ```photos
 {
   "query": {
@@ -245,6 +324,7 @@ For example, if you wanted to show photos of food taken on every April 1st, you 
   }
 }
 ```
+
 ```
 
 ## Adjusting the visual style
@@ -266,3 +346,4 @@ This means you can't have a remote thumbnail image, and you can't have a link to
 
 ## Attribution
 Loading spinner from [loading.io](https://loading.io/)
+```
